@@ -1,1 +1,276 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Kelola User - CRUD Modular</title>
+  <style>
+    /* --- DESIGN SYSTEM & RESPONSIVE LAYOUT --- */
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --success: #10b981;
+      --bg-main: #f8fafc;
+      --bg-card: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 8px;
+    }
 
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background-color: var(--bg-main); color: var(--text-main); padding: 2rem 1rem; }
+    .container { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr; gap: 2rem; }
+    
+    /* Responsive Grid (Desktop) */
+    @media (min-width: 768px) {
+      .container { grid-template-columns: 350px 1fr; }
+    }
+
+    /* Components */
+    .card { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card h2 { margin-bottom: 1.25rem; font-size: 1.25rem; display: flex; justify-content: space-between; }
+    
+    /* Form Control */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.35rem; font-weight: 500; font-size: 0.9rem; }
+    .form-control { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; transition: border 0.2s; }
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+    
+    /* Buttons */
+    .btn { padding: 0.6rem 1.2rem; border: none; border-radius: var(--radius); font-weight: 500; cursor: pointer; transition: background 0.2s; font-size: 0.9rem; }
+    .btn-primary { background: var(--primary); color: white; width: 100%; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: var(--danger-hover); }
+    .btn-text { background: transparent; color: var(--text-muted); padding: 0.2rem 0.5rem; }
+    
+    /* Table Responsive Wrapper */
+    .table-wrapper { overflow-x: auto; width: 100%; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
+    th, td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); }
+    th { background: #f1f5f9; font-weight: 600; color: var(--text-muted); }
+    tr:hover { background: #f8fafc; }
+    
+    .actions { display: flex; gap: 0.5rem; }
+    .badge { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+    .badge-admin { background: #e0e7ff; color: #3730a3; }
+    .badge-user { background: #f0fdf4; color: #166534; }
+  </style>
+</head>
+<body>
+
+  <main class="container">
+    <section class="card">
+      <h2 id="form-title">Tambah User</h2>
+      <form id="user-form">
+        <input type="hidden" id="user-id">
+        
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" class="form-control" required placeholder="ex: john_doe">
+        </div>
+        
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" class="form-control" required placeholder="ex: john@mail.com">
+        </div>
+        
+        <div class="form-group">
+          <label for="role">Role</label>
+          <select id="role" class="form-control" required>
+            <option value="User">User</option>
+            <option value="Admin">Admin</option>
+          </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" id="btn-submit">Simpan User</button>
+        <button type="button" class="btn btn-text" id="btn-cancel" style="display: none; margin-top: 0.5rem; width: 100%;">Batal Edit</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Daftar Akun Terdaftar</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body">
+            </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    /**
+     * ==========================================
+     * REUSABLE STORE & API LAYER (Modular & DRY)
+     * ==========================================
+     */
+    const UserStore = {
+      LOCAL_STORAGE_KEY: 'crud_users_data',
+
+      // Mengambil data (dari LocalStorage atau Fetch dari JSON jika kosong)
+      async getAll() {
+        let data = localStorage.getItem(this.LOCAL_STORAGE_KEY);
+        if (!data) {
+          try {
+            const response = await fetch('users.json');
+            if (!response.ok) throw new Error('Gagal memuat dataset awal.');
+            const initialData = await response.json();
+            this.saveAll(initialData);
+            return initialData;
+          } catch (error) {
+            console.error(error);
+            return [];
+          }
+        }
+        return JSON.parse(data);
+      },
+
+      saveAll(users) {
+        localStorage.setItem(this.LOCAL_STORAGE_KEY, JSON.stringify(users));
+      },
+
+      async getById(id) {
+        const users = await this.getAll();
+        return users.find(u => u.id === parseInt(id));
+      },
+
+      async save(user) {
+        const users = await this.getAll();
+        if (user.id) {
+          // Update existing (Scalable approach using map)
+          const updatedUsers = users.map(u => u.id === parseInt(user.id) ? { ...u, ...user, id: parseInt(user.id) } : u);
+          this.saveAll(updatedUsers);
+        } else {
+          // Create new with auto-increment ID
+          user.id = users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1;
+          users.push(user);
+          this.saveAll(users);
+        }
+      },
+
+      async delete(id) {
+        const users = await this.getAll();
+        const filteredUsers = users.filter(u => u.id !== parseInt(id));
+        this.saveAll(filteredUsers);
+      }
+    };
+
+    /**
+     * ==========================================
+     * UI RENDERING ENGINE (Consistent & Clean)
+     * ==========================================
+     */
+    const UserUI = {
+      elements: {
+        form: document.getElementById('user-form'),
+        idInput: document.getElementById('user-id'),
+        usernameInput: document.getElementById('username'),
+        emailInput: document.getElementById('email'),
+        roleInput: document.getElementById('role'),
+        tableBody: document.getElementById('user-table-body'),
+        formTitle: document.getElementById('form-title'),
+        btnSubmit: document.getElementById('btn-submit'),
+        btnCancel: document.getElementById('btn-cancel')
+      },
+
+      async renderTable() {
+        const users = await UserStore.getAll();
+        this.elements.tableBody.innerHTML = users.length === 0 
+          ? `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Tidak ada data user.</td></tr>`
+          : users.map(user => `
+              <tr>
+                <td>${user.id}</td>
+                <td><strong>${user.username}</strong></td>
+                <td>${user.email}</td>
+                <td><span class="badge badge-${user.role.toLowerCase()}">${user.role}</span></td>
+                <td class="actions">
+                  <button class="btn btn-text" onclick="App.handleEdit(${user.id})" style="color: var(--primary)">Edit</button>
+                  <button class="btn btn-text btn-danger-text" onclick="App.handleDelete(${user.id})" style="color: var(--danger)">Hapus</button>
+                </td>
+              </tr>
+            `).join('');
+      },
+
+      fillForm(user) {
+        this.elements.idInput.value = user.id;
+        this.elements.usernameInput.value = user.username;
+        this.elements.emailInput.value = user.email;
+        this.elements.roleInput.value = user.role;
+        
+        this.elements.formTitle.innerText = "Edit User ID: " + user.id;
+        this.elements.btnSubmit.innerText = "Update Perubahan";
+        this.elements.btnCancel.style.display = "block";
+      },
+
+      resetForm() {
+        this.elements.form.reset();
+        this.elements.idInput.value = "";
+        this.elements.formTitle.innerText = "Tambah User";
+        this.elements.btnSubmit.innerText = "Simpan User";
+        this.elements.btnCancel.style.display = "none";
+      }
+    };
+
+    /**
+     * ==========================================
+     * APPLICATION CONTROLLER (Event Handling)
+     * ==========================================
+     */
+    const App = {
+      async init() {
+        // Setup Event Listeners
+        UserUI.elements.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        UserUI.elements.btnCancel.addEventListener('click', () => UserUI.resetForm());
+        
+        // Initial Load Table
+        await UserUI.renderTable();
+      },
+
+      async handleSubmit(e) {
+        e.preventDefault();
+        
+        const userData = {
+          id: UserUI.elements.idInput.value || null,
+          username: UserUI.elements.usernameInput.value.trim(),
+          email: UserUI.elements.emailInput.value.trim(),
+          role: UserUI.elements.roleInput.value
+        };
+
+        await UserStore.save(userData);
+        UserUI.resetForm();
+        await UserUI.renderTable();
+      },
+
+      async handleEdit(id) {
+        const user = await UserStore.getById(id);
+        if (user) UserUI.fillForm(user);
+      },
+
+      async handleDelete(id) {
+        if (confirm(`Apakah Anda yakin ingin menghapus user dengan ID ${id}?`)) {
+          await UserStore.delete(id);
+          // Jika sedang mengedit user yang dihapus, reset formnya
+          if (UserUI.elements.idInput.value == id) UserUI.resetForm();
+          await UserUI.renderTable();
+        }
+      }
+    };
+
+    // Jalankan aplikasi setelah DOM siap
+    document.addEventListener('DOMContentLoaded', () => App.init());
+  </script>
+</body>
+</html>
