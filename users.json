@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@mail.com",
+    "role": "Admin"
+  },
+  {
+    "id": 2,
+    "username": "shaula_muliawan",
+    "email": "shaulamuliawan@gmail.com",
+    "role": "User"
+  },
+  {
+    "id": 3,
+    "username": "citra_lestari",
+    "email": "citra@mail.com",
+    "role": "User"
+  }
+]
